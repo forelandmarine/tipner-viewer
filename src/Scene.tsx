@@ -359,7 +359,7 @@ function WaterPlane({
     });
 
     water.rotation.x = -Math.PI / 2;
-    water.position.y = -1;
+    water.position.y = -17;
 
     waterRef.current = water;
     groupRef.current.add(water);
