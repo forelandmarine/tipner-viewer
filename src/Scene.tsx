@@ -2,7 +2,6 @@ import { useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Sky } from "@react-three/drei";
 import * as THREE from "three";
-import { Water } from "three/examples/jsm/objects/Water.js";
 import {
   createConcreteTextures,
   createGrassTextures,
@@ -100,7 +99,7 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
   const { camera, gl } = useThree();
   const flyProgress = useRef(0);
   const flyCurve = useMemo(() => buildFlyPath(), []);
-  const waterRef = useRef<Water>(null);
+
 
   const animating = useRef(false);
   const animStart = useRef({
@@ -219,11 +218,6 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
   }, [cameraIndex, flying]);
 
   useFrame((_, delta) => {
-    // Animate water
-    if (waterRef.current) {
-      waterRef.current.material.uniforms["time"].value += delta * 0.3;
-    }
-
     if (flying) {
       flyProgress.current += delta * 0.012;
       if (flyProgress.current > 1) flyProgress.current -= 1;
@@ -258,11 +252,6 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
   });
 
   // Create water geometry matching the original water mesh bounds
-  const sunDirection = useMemo(
-    () => new THREE.Vector3(0.5, 0.6, 0.3).normalize(),
-    []
-  );
-
   return (
     <>
       {/* Lighting */}
@@ -306,8 +295,11 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
       {/* Model */}
       <primitive object={scene} />
 
-      {/* Animated water */}
-      <WaterPlane waterRef={waterRef} sunDirection={sunDirection} />
+      {/* Water */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -17, 0]}>
+        <planeGeometry args={[6000, 6000]} />
+        <meshStandardMaterial color="#4a90b8" roughness={0.3} metalness={0.1} envMapIntensity={0.4} />
+      </mesh>
 
       <OrbitControls
         ref={controlsRef}
@@ -321,74 +313,6 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
       />
     </>
   );
-}
-
-function WaterPlane({
-  waterRef,
-  sunDirection,
-}: {
-  waterRef: React.RefObject<Water | null>;
-  sunDirection: THREE.Vector3;
-}) {
-  const groupRef = useRef<THREE.Group>(null);
-
-  useEffect(() => {
-    if (!groupRef.current) return;
-    const geometry = new THREE.PlaneGeometry(6000, 6000, 128, 128);
-
-    // Generate a procedural normal map for wave detail
-    const size = 256;
-    const data = new Uint8Array(size * size * 4);
-    for (let y = 0; y < size; y++) {
-      for (let x = 0; x < size; x++) {
-        const i = (y * size + x) * 4;
-        const fx = x / size;
-        const fy = y / size;
-        const nx =
-          Math.sin(fx * Math.PI * 8) * 0.3 +
-          Math.sin(fx * Math.PI * 16 + fy * Math.PI * 4) * 0.15 +
-          Math.sin((fx + fy) * Math.PI * 12) * 0.1;
-        const ny =
-          Math.sin(fy * Math.PI * 6) * 0.3 +
-          Math.cos(fy * Math.PI * 14 + fx * Math.PI * 6) * 0.15 +
-          Math.sin((fx - fy) * Math.PI * 10) * 0.1;
-        data[i] = ((nx + 1) * 0.5 * 255) | 0;
-        data[i + 1] = ((ny + 1) * 0.5 * 255) | 0;
-        data[i + 2] = 200;
-        data[i + 3] = 255;
-      }
-    }
-    const normalTex = new THREE.DataTexture(data, size, size, THREE.RGBAFormat);
-    normalTex.wrapS = normalTex.wrapT = THREE.RepeatWrapping;
-    normalTex.needsUpdate = true;
-
-    const water = new Water(geometry, {
-      textureWidth: 512,
-      textureHeight: 512,
-      waterNormals: normalTex,
-      sunDirection: sunDirection,
-      sunColor: 0xfff5e0,
-      waterColor: 0x0e3d5c,
-      distortionScale: 3.0,
-      fog: true,
-      alpha: 0.88,
-    });
-
-    water.rotation.x = -Math.PI / 2;
-    water.position.y = -17;
-
-    waterRef.current = water;
-    groupRef.current.add(water);
-
-    return () => {
-      groupRef.current?.remove(water);
-      geometry.dispose();
-      normalTex.dispose();
-      water.material.dispose();
-    };
-  }, [sunDirection, waterRef]);
-
-  return <group ref={groupRef} />;
 }
 
 function easeInOutCubic(t: number) {
