@@ -3,62 +3,63 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Sky } from "@react-three/drei";
 import * as THREE from "three";
 import { Water } from "three/examples/jsm/objects/Water.js";
+import {
+  createConcreteTextures,
+  createGrassTextures,
+  createBrickTextures,
+  createWoodTextures,
+  createTarmacTextures,
+  createRoofTextures,
+  createHardstandTextures,
+  createSteelTextures,
+  applyProceduralTexture,
+  type ProceduralTexture,
+} from "./textures";
 
-// Material color + property overrides for the GLB model.
-// Many materials exported as white (1,1,1) because Blender textures didn't transfer.
-const MATERIAL_FIXES: Record<
+// Simple color-only overrides for materials that don't need full procedural textures
+const SIMPLE_FIXES: Record<
   string,
-  { color?: string; roughness?: number; metalness?: number; envMapIntensity?: number }
+  { color: string; roughness?: number; metalness?: number; envMapIntensity?: number }
 > = {
-  // Surfaces
-  Concrete: { color: "#b8b4ac", roughness: 0.92 },
-  Hardstand: { color: "#a09a90", roughness: 0.95 },
-  Tarmac: { color: "#2a2a2a", roughness: 0.88 },
-  Road: { color: "#3a3a38", roughness: 0.85 },
   ParkLine: { color: "#e8e4d8", roughness: 0.6 },
-
-  // Buildings
-  Brick: { color: "#8b7355", roughness: 0.85 },
-  Roof: { color: "#5a6670", roughness: 0.6, metalness: 0.3 },
-
-  // Landscape
-  Grass: { color: "#4a7a3a", roughness: 0.95 },
-
-  // Marina
-  Pontoon: { color: "#8b7255", roughness: 0.75 },
-  "Pontoon.001": { color: "#8b7255", roughness: 0.75 },
-  "Pontoon.002": { color: "#8b7255", roughness: 0.75 },
-  "Pontoon.003": { color: "#8b7255", roughness: 0.75 },
-  "Pontoon.004": { color: "#8b7255", roughness: 0.75 },
-  "Pontoon.005": { color: "#8b7255", roughness: 0.75 },
-  "Pontoon.006": { color: "#8b7255", roughness: 0.75 },
-  "Pontoon.007": { color: "#8b7255", roughness: 0.75 },
-  "Pontoon.008": { color: "#8b7255", roughness: 0.75 },
-  Pile: { color: "#6b6b68", roughness: 0.45, metalness: 0.75 },
-  Dolphin: { color: "#7a7a78", roughness: 0.65, metalness: 0.4 },
-
-  // Structures
-  Gate: { color: "#404248", roughness: 0.5, metalness: 0.65 },
-  Cradle: { color: "#2a4570", roughness: 0.5, metalness: 0.6 },
-  Hoist: { color: "#d4a810", roughness: 0.35, metalness: 0.55 },
-  HoistStl: { color: "#606060", roughness: 0.3, metalness: 0.85 },
+  Gate: { color: "#404248", roughness: 0.5, metalness: 0.65, envMapIntensity: 0.8 },
+  Cradle: { color: "#2a4570", roughness: 0.5, metalness: 0.6, envMapIntensity: 0.7 },
+  Hoist: { color: "#d4a810", roughness: 0.35, metalness: 0.55, envMapIntensity: 0.9 },
+  HoistStl: { color: "#606060", roughness: 0.3, metalness: 0.85, envMapIntensity: 1.0 },
   Green: { color: "#2d6b3f", roughness: 0.5, metalness: 0.3 },
-
-  // Vessels
   HullB: { color: "#0a1840", roughness: 0.08, envMapIntensity: 1.5 },
   HullD: { color: "#040a1e", roughness: 0.08, envMapIntensity: 1.5 },
   HullW: { color: "#f0f0ec", roughness: 0.08, envMapIntensity: 1.2 },
   Super: { color: "#f5f5f3", roughness: 0.06, envMapIntensity: 1.5 },
   Glass: { color: "#6080a0", roughness: 0.01, metalness: 0.1, envMapIntensity: 2.0 },
   Deck: { color: "#c4a060", roughness: 0.7 },
-
-  // Cars
   CarBlk: { color: "#050505", roughness: 0.15, envMapIntensity: 1.5 },
   CarBlu: { color: "#0c2860", roughness: 0.2, envMapIntensity: 1.2 },
   CarRed: { color: "#8c1408", roughness: 0.2, envMapIntensity: 1.2 },
   CarSlv: { color: "#a5a5a0", roughness: 0.15, metalness: 0.55, envMapIntensity: 1.5 },
   CarWht: { color: "#e8e8e5", roughness: 0.15, envMapIntensity: 1.2 },
 };
+
+// Map material names to procedural texture generators
+const PROCEDURAL_MAP: Record<string, () => ProceduralTexture> = {
+  Concrete: createConcreteTextures,
+  Hardstand: createHardstandTextures,
+  Tarmac: createTarmacTextures,
+  Road: createTarmacTextures,
+  Brick: createBrickTextures,
+  Grass: createGrassTextures,
+  Roof: createRoofTextures,
+};
+
+// All pontoon variants get wood
+for (let i = 0; i <= 8; i++) {
+  const key = i === 0 ? "Pontoon" : `Pontoon.00${i}`;
+  PROCEDURAL_MAP[key] = createWoodTextures;
+}
+
+// Steel for piles and dolphins
+PROCEDURAL_MAP["Pile"] = createSteelTextures;
+PROCEDURAL_MAP["Dolphin"] = createSteelTextures;
 
 // Model is ~2000x2000 in XZ, ~40 tall after centering at origin
 const CAMERA_POINTS = [
@@ -147,6 +148,9 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
     envScene.add(new THREE.Mesh(envGeo, envMat));
     const envMap = pmremGenerator.fromScene(envScene, 0, 0.1, 200).texture;
 
+    // Cache procedural textures so shared materials reuse the same textures
+    const texCache: Record<string, ProceduralTexture> = {};
+
     scene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       const mat = child.material as THREE.MeshStandardMaterial;
@@ -159,16 +163,28 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
         return;
       }
 
-      const fix = MATERIAL_FIXES[mat.name];
+      // Procedural textures (color + normal + roughness maps)
+      const procGen = PROCEDURAL_MAP[mat.name];
+      if (procGen) {
+        if (!texCache[mat.name]) {
+          texCache[mat.name] = procGen();
+        }
+        const envI = mat.name === "Pile" || mat.name === "Dolphin" ? 0.8
+          : mat.name === "Roof" ? 0.7 : 0.5;
+        applyProceduralTexture(mat, texCache[mat.name], envMap, envI);
+        return;
+      }
+
+      // Simple color overrides
+      const fix = SIMPLE_FIXES[mat.name];
       if (fix) {
-        if (fix.color) mat.color.set(fix.color);
+        mat.color.set(fix.color);
         if (fix.roughness !== undefined) mat.roughness = fix.roughness;
         if (fix.metalness !== undefined) mat.metalness = fix.metalness;
         mat.envMap = envMap;
         mat.envMapIntensity = fix.envMapIntensity ?? 0.6;
         mat.needsUpdate = true;
       } else {
-        // Default: give everything an env map for subtle reflections
         mat.envMap = envMap;
         mat.envMapIntensity = 0.4;
         mat.needsUpdate = true;
