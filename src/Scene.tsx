@@ -2,20 +2,8 @@ import { useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Sky } from "@react-three/drei";
 import * as THREE from "three";
-import {
-  createConcreteTextures,
-  createGrassTextures,
-  createBrickTextures,
-  createWoodTextures,
-  createTarmacTextures,
-  createRoofTextures,
-  createHardstandTextures,
-  createSteelTextures,
-  applyProceduralTexture,
-  type ProceduralTexture,
-} from "./textures";
 
-// Simple color overrides for materials without procedural textures
+// Color overrides for materials not covered by baked textures
 const COLOR_FIXES: Record<
   string,
   { color: string; roughness?: number; metalness?: number; envMapIntensity?: number }
@@ -38,22 +26,6 @@ const COLOR_FIXES: Record<
   CarSlv: { color: "#a5a5a0", roughness: 0.15, metalness: 0.55, envMapIntensity: 1.5 },
   CarWht: { color: "#e8e8e5", roughness: 0.15, envMapIntensity: 1.2 },
 };
-
-// Procedural texture generators for surfaces
-const PROCEDURAL_MAP: Record<string, () => ProceduralTexture> = {
-  Concrete: createConcreteTextures,
-  Hardstand: createHardstandTextures,
-  Tarmac: createTarmacTextures,
-  Road: createTarmacTextures,
-  Brick: createBrickTextures,
-  Grass: createGrassTextures,
-  Roof: createRoofTextures,
-  Pile: createSteelTextures,
-  Dolphin: createSteelTextures,
-};
-for (let i = 0; i <= 8; i++) {
-  PROCEDURAL_MAP[i === 0 ? "Pontoon" : `Pontoon.00${i}`] = createWoodTextures;
-}
 
 const CAMERA_POINTS = [
   { pos: [1400, 1000, 1400], target: [0, 0, 0] },
@@ -137,8 +109,6 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
     envScene.add(new THREE.Mesh(envGeo, envMat));
     const envMap = pmremGenerator.fromScene(envScene, 0, 0.1, 200).texture;
 
-    const texCache: Record<string, ProceduralTexture> = {};
-
     scene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       const mat = child.material as THREE.MeshStandardMaterial;
@@ -150,17 +120,7 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
         return;
       }
 
-      // Procedural textures (color + normal + roughness maps)
-      const procGen = PROCEDURAL_MAP[mat.name];
-      if (procGen) {
-        if (!texCache[mat.name]) texCache[mat.name] = procGen();
-        const envI = mat.name === "Pile" || mat.name === "Dolphin" ? 0.8
-          : mat.name === "Roof" ? 0.7 : 0.5;
-        applyProceduralTexture(mat, texCache[mat.name], envMap, envI);
-        return;
-      }
-
-      // Simple color overrides
+      // Color overrides for non-baked materials
       const fix = COLOR_FIXES[mat.name];
       if (fix) {
         mat.color.set(fix.color);
@@ -170,6 +130,7 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
         mat.envMapIntensity = fix.envMapIntensity ?? 0.6;
         mat.needsUpdate = true;
       } else {
+        // Env map for reflections on all materials
         mat.envMap = envMap;
         mat.envMapIntensity = 0.4;
         mat.needsUpdate = true;
