@@ -12,7 +12,7 @@ export default function App() {
       <Canvas
         shadows
         camera={{ position: [1400, 1000, 1400], fov: 45, near: 1, far: 10000 }}
-        gl={{ preserveDrawingBuffer: true, antialias: true }}
+        gl={{ preserveDrawingBuffer: true, antialias: true, toneMapping: 4, toneMappingExposure: 1.1 }}
       >
         <Suspense fallback={null}>
           <Scene

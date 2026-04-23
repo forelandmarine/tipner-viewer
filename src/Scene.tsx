@@ -98,10 +98,15 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
         void main() {
           vec3 dir = normalize(vWorldPos);
           float t = dir.y * 0.5 + 0.5;
-          vec3 skyTop = vec3(0.35, 0.55, 0.85);
-          vec3 skyBot = vec3(0.7, 0.8, 0.9);
-          vec3 ground = vec3(0.4, 0.38, 0.35);
-          vec3 col = t > 0.5 ? mix(skyBot, skyTop, (t - 0.5) * 2.0) : mix(ground, skyBot, t * 2.0);
+          vec3 zenith  = vec3(0.30, 0.50, 0.82);
+          vec3 horizon = vec3(0.65, 0.75, 0.88);
+          vec3 ground  = vec3(0.35, 0.33, 0.30);
+          vec3 sun     = vec3(1.0, 0.95, 0.85);
+          vec3 col = t > 0.5 ? mix(horizon, zenith, (t - 0.5) * 2.0) : mix(ground, horizon, t * 2.0);
+          // sun glow towards light direction
+          float sunDot = max(0.0, dot(dir, normalize(vec3(0.5, 0.4, 0.3))));
+          col += sun * pow(sunDot, 32.0) * 0.3;
+          col += sun * pow(sunDot, 4.0) * 0.08;
           gl_FragColor = vec4(col, 1.0);
         }
       `,
@@ -201,13 +206,14 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
   return (
     <>
       {/* Lighting */}
-      <ambientLight intensity={0.35} color="#e8e4f0" />
+      <ambientLight intensity={0.25} color="#dde4f0" />
       <directionalLight
-        position={[800, 1500, 600]}
-        intensity={1.4}
-        color="#fff5e0"
+        position={[800, 1200, 500]}
+        intensity={1.6}
+        color="#fff8e8"
         castShadow
         shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0002}
         shadow-camera-far={4000}
         shadow-camera-left={-1500}
         shadow-camera-right={1500}
@@ -215,37 +221,42 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
         shadow-camera-bottom={-1500}
       />
       <directionalLight
-        position={[-600, 800, -400]}
-        intensity={0.3}
-        color="#c0d0f0"
+        position={[-500, 600, -300]}
+        intensity={0.25}
+        color="#b0c8e8"
       />
-      <hemisphereLight args={["#87CEEB", "#8a7a60", 0.3]} />
+      <directionalLight
+        position={[0, 400, 800]}
+        intensity={0.15}
+        color="#e0d8c8"
+      />
+      <hemisphereLight args={["#88bce0", "#6a6050", 0.35]} />
 
       {/* Sky */}
       <Sky
         distance={50000}
-        sunPosition={[800, 600, 300]}
-        inclination={0.52}
-        azimuth={0.25}
-        rayleigh={1.5}
-        turbidity={8}
-        mieCoefficient={0.005}
-        mieDirectionalG={0.8}
+        sunPosition={[800, 500, 400]}
+        inclination={0.49}
+        azimuth={0.22}
+        rayleigh={1.2}
+        turbidity={6}
+        mieCoefficient={0.004}
+        mieDirectionalG={0.82}
       />
 
-      <fog attach="fog" args={["#c8d8e8", 2000, 7000]} />
+      <fog attach="fog" args={["#c4d4e4", 2500, 8000]} />
 
       {/* Model */}
       <primitive object={scene} />
 
-      {/* Flat water plane */}
+      {/* Water */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -17, 0]}>
         <planeGeometry args={[6000, 6000]} />
         <meshStandardMaterial
-          color="#4a90b8"
-          roughness={0.3}
-          metalness={0.1}
-          envMapIntensity={0.4}
+          color="#4888b0"
+          roughness={0.25}
+          metalness={0.05}
+          envMapIntensity={0.6}
         />
       </mesh>
 
