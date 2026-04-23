@@ -2,23 +2,12 @@ import { useRef, useEffect, useMemo } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { OrbitControls, useGLTF, Sky } from "@react-three/drei";
 import * as THREE from "three";
-import {
-  createConcreteTextures,
-  createGrassTextures,
-  createBrickTextures,
-  createWoodTextures,
-  createTarmacTextures,
-  createRoofTextures,
-  createHardstandTextures,
-  createSteelTextures,
-  applyProceduralTexture,
-  type ProceduralTexture,
-} from "./textures";
 
-// Simple color-only overrides for materials that don't need full procedural textures
-const SIMPLE_FIXES: Record<
+// Color overrides only for materials that Blender didn't texture
+// (vessels, cars, structural elements that were already correct colors)
+const COLOR_FIXES: Record<
   string,
-  { color: string; roughness?: number; metalness?: number; envMapIntensity?: number }
+  { color?: string; roughness?: number; metalness?: number; envMapIntensity?: number }
 > = {
   ParkLine: { color: "#e8e4d8", roughness: 0.6 },
   Gate: { color: "#404248", roughness: 0.5, metalness: 0.65, envMapIntensity: 0.8 },
@@ -39,28 +28,6 @@ const SIMPLE_FIXES: Record<
   CarWht: { color: "#e8e8e5", roughness: 0.15, envMapIntensity: 1.2 },
 };
 
-// Map material names to procedural texture generators
-const PROCEDURAL_MAP: Record<string, () => ProceduralTexture> = {
-  Concrete: createConcreteTextures,
-  Hardstand: createHardstandTextures,
-  Tarmac: createTarmacTextures,
-  Road: createTarmacTextures,
-  Brick: createBrickTextures,
-  Grass: createGrassTextures,
-  Roof: createRoofTextures,
-};
-
-// All pontoon variants get wood
-for (let i = 0; i <= 8; i++) {
-  const key = i === 0 ? "Pontoon" : `Pontoon.00${i}`;
-  PROCEDURAL_MAP[key] = createWoodTextures;
-}
-
-// Steel for piles and dolphins
-PROCEDURAL_MAP["Pile"] = createSteelTextures;
-PROCEDURAL_MAP["Dolphin"] = createSteelTextures;
-
-// Model is ~2000x2000 in XZ, ~40 tall after centering at origin
 const CAMERA_POINTS = [
   { pos: [1400, 1000, 1400], target: [0, 0, 0] },
   { pos: [-800, 500, 1000], target: [100, 0, -100] },
@@ -100,7 +67,6 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
   const flyProgress = useRef(0);
   const flyCurve = useMemo(() => buildFlyPath(), []);
 
-
   const animating = useRef(false);
   const animStart = useRef({
     pos: new THREE.Vector3(),
@@ -115,10 +81,7 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
   // Build environment cube map for reflections
   const pmremGenerator = useMemo(() => new THREE.PMREMGenerator(gl), [gl]);
 
-  // Fix materials and extract water mesh
-  const waterMeshRef = useRef<THREE.Mesh | null>(null);
   useEffect(() => {
-    // Generate an environment map from a simple gradient for reflections
     const envScene = new THREE.Scene();
     const envGeo = new THREE.SphereGeometry(100, 32, 32);
     const envMat = new THREE.ShaderMaterial({
@@ -147,43 +110,28 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
     envScene.add(new THREE.Mesh(envGeo, envMat));
     const envMap = pmremGenerator.fromScene(envScene, 0, 0.1, 200).texture;
 
-    // Cache procedural textures so shared materials reuse the same textures
-    const texCache: Record<string, ProceduralTexture> = {};
-
     scene.traverse((child) => {
       if (!(child instanceof THREE.Mesh)) return;
       const mat = child.material as THREE.MeshStandardMaterial;
       if (!mat || !mat.name) return;
 
-      // Hide the water mesh from the GLB; we'll replace it
+      // Hide the GLB water mesh, we use our own flat plane
       if (mat.name === "Water") {
         child.visible = false;
-        waterMeshRef.current = child;
         return;
       }
 
-      // Procedural textures (color + normal + roughness maps)
-      const procGen = PROCEDURAL_MAP[mat.name];
-      if (procGen) {
-        if (!texCache[mat.name]) {
-          texCache[mat.name] = procGen();
-        }
-        const envI = mat.name === "Pile" || mat.name === "Dolphin" ? 0.8
-          : mat.name === "Roof" ? 0.7 : 0.5;
-        applyProceduralTexture(mat, texCache[mat.name], envMap, envI);
-        return;
-      }
-
-      // Simple color overrides
-      const fix = SIMPLE_FIXES[mat.name];
+      // Apply color overrides for non-textured materials
+      const fix = COLOR_FIXES[mat.name];
       if (fix) {
-        mat.color.set(fix.color);
+        if (fix.color) mat.color.set(fix.color);
         if (fix.roughness !== undefined) mat.roughness = fix.roughness;
         if (fix.metalness !== undefined) mat.metalness = fix.metalness;
         mat.envMap = envMap;
         mat.envMapIntensity = fix.envMapIntensity ?? 0.6;
         mat.needsUpdate = true;
       } else {
+        // All materials get env map for reflections
         mat.envMap = envMap;
         mat.envMapIntensity = 0.4;
         mat.needsUpdate = true;
@@ -251,7 +199,6 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
     }
   });
 
-  // Create water geometry matching the original water mesh bounds
   return (
     <>
       {/* Lighting */}
@@ -273,11 +220,9 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
         intensity={0.3}
         color="#c0d0f0"
       />
-      <hemisphereLight
-        args={["#87CEEB", "#8a7a60", 0.3]}
-      />
+      <hemisphereLight args={["#87CEEB", "#8a7a60", 0.3]} />
 
-      {/* Realistic sky with sun */}
+      {/* Sky */}
       <Sky
         distance={50000}
         sunPosition={[800, 600, 300]}
@@ -289,16 +234,20 @@ export function Scene({ flying, cameraIndex }: SceneProps) {
         mieDirectionalG={0.8}
       />
 
-      {/* Fog for depth */}
       <fog attach="fog" args={["#c8d8e8", 2000, 7000]} />
 
       {/* Model */}
       <primitive object={scene} />
 
-      {/* Water */}
+      {/* Flat water plane */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -17, 0]}>
         <planeGeometry args={[6000, 6000]} />
-        <meshStandardMaterial color="#4a90b8" roughness={0.3} metalness={0.1} envMapIntensity={0.4} />
+        <meshStandardMaterial
+          color="#4a90b8"
+          roughness={0.3}
+          metalness={0.1}
+          envMapIntensity={0.4}
+        />
       </mesh>
 
       <OrbitControls
