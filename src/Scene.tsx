@@ -27,27 +27,38 @@ const COLOR_FIXES: Record<
   CarWht: { color: "#e8e8e5", roughness: 0.15, envMapIntensity: 1.2 },
 };
 
+// Key positions (Three.js coords):
+// Yard center: (6, -16, 14)
+// Marina/pontoons: (-97, -16, -237)
+// Travel lift: (59, -15, -65)
+// Piers: (90, -16, -125)
 const CAMERA_POINTS = [
-  { pos: [1400, 1000, 1400], target: [0, 0, 0] },
-  { pos: [-800, 500, 1000], target: [100, 0, -100] },
-  { pos: [1000, 500, -700], target: [0, 0, 100] },
-  { pos: [-400, 150, -300], target: [-600, 0, -500] },
-  { pos: [400, 200, -600], target: [200, 20, -300] },
-  { pos: [900, 120, 500], target: [0, 30, 0] },
+  // 0: Aerial overview
+  { pos: [500, 600, 500], target: [0, -16, -80] },
+  // 1: North approach (from marina side)
+  { pos: [-300, 300, -500], target: [0, -16, -100] },
+  // 2: South approach
+  { pos: [300, 300, 400], target: [0, -16, -50] },
+  // 3: Marina close-up
+  { pos: [-200, 80, -350], target: [-80, -16, -220] },
+  // 4: Travel lift
+  { pos: [150, 80, -180], target: [60, -10, -80] },
+  // 5: Hero shot
+  { pos: [350, 60, 100], target: [0, -10, -80] },
 ] as const;
 
 function buildFlyPath() {
   const points = [
-    new THREE.Vector3(1800, 1200, 1800),
-    new THREE.Vector3(1000, 800, 1000),
-    new THREE.Vector3(-400, 500, 800),
-    new THREE.Vector3(-700, 250, -100),
-    new THREE.Vector3(-400, 180, -500),
-    new THREE.Vector3(200, 150, -600),
-    new THREE.Vector3(700, 200, -400),
-    new THREE.Vector3(1000, 400, 300),
-    new THREE.Vector3(1400, 700, 900),
-    new THREE.Vector3(1800, 1200, 1800),
+    new THREE.Vector3(600, 500, 600),
+    new THREE.Vector3(300, 350, 300),
+    new THREE.Vector3(-200, 250, -100),
+    new THREE.Vector3(-300, 150, -350),
+    new THREE.Vector3(-150, 80, -400),
+    new THREE.Vector3(100, 80, -300),
+    new THREE.Vector3(200, 100, -100),
+    new THREE.Vector3(350, 150, 100),
+    new THREE.Vector3(500, 300, 400),
+    new THREE.Vector3(600, 500, 600),
   ];
   return new THREE.CatmullRomCurve3(points, true, "centripetal", 0.5);
 }
