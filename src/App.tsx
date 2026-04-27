@@ -1,6 +1,7 @@
 import { Canvas } from "@react-three/fiber";
 import { Scene } from "./Scene";
 import { Overlay } from "./Overlay";
+import { LoadingScreen } from "./LoadingScreen";
 import { useState, Suspense } from "react";
 
 export default function App() {
@@ -29,6 +30,7 @@ export default function App() {
         cameraIndex={cameraIndex}
         setCameraIndex={setCameraIndex}
       />
+      <LoadingScreen />
     </div>
   );
 }

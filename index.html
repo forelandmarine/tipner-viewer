@@ -5,8 +5,55 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>tipner-viewer</title>
+    <style>
+      html, body { margin: 0; padding: 0; background: #0a0a0a; }
+      #initial-loader {
+        position: fixed;
+        inset: 0;
+        background: #0a0a0a;
+        color: white;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 28px;
+        z-index: 200;
+        font-family: 'Inter', system-ui, -apple-system, sans-serif;
+        transition: opacity 400ms ease-out;
+      }
+      #initial-loader h1 { font-size: 22px; font-weight: 600; margin: 0; letter-spacing: 0.02em; }
+      #initial-loader p  { font-size: 13px; margin: 6px 0 0; opacity: 0.55; }
+      #initial-loader .bar {
+        width: 320px; height: 4px;
+        background: rgba(255,255,255,0.1);
+        border-radius: 2px;
+        overflow: hidden;
+        position: relative;
+      }
+      #initial-loader .bar::after {
+        content: '';
+        position: absolute;
+        top: 0; bottom: 0; left: -40%;
+        width: 40%;
+        background: linear-gradient(90deg, transparent, #6090c0, #b8d4e8, transparent);
+        animation: il-slide 1.4s ease-in-out infinite;
+      }
+      #initial-loader .label { font-size: 12px; opacity: 0.6; }
+      @keyframes il-slide {
+        0%   { left: -40%; }
+        100% { left: 100%; }
+      }
+    </style>
   </head>
   <body>
+    <div id="initial-loader">
+      <div style="text-align:center">
+        <h1>Tipner West Shipyard</h1>
+        <p>Foreland Shipyard Group</p>
+      </div>
+      <div class="bar"></div>
+      <div class="label">Loading viewer&hellip;</div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
